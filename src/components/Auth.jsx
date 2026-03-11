@@ -54,11 +54,18 @@ export default function Auth() {
     }
   }
 
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+
   return (
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-title">🎮 My Life</div>
         <div className="auth-subtitle">Track every dimension of your life.</div>
+
+        {/* TEMPORARY DEBUG — remove after fixing */}
+        <div style={{fontSize:'10px',color:'#aaa',wordBreak:'break-all',marginBottom:'8px',padding:'6px',background:'#f5f5f5',borderRadius:'6px'}}>
+          DB: {supabaseUrl || '⚠️ NOT SET'}
+        </div>
 
         {error && (
           <div className="auth-error">{error}</div>
