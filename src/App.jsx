@@ -136,8 +136,8 @@ export default function App() {
   const handleLogEntry = useCallback(async (text) => {
     if (!userId) return null
 
-    // Client-side keyword categorisation — instant, free, works offline
-    const { stat_key: statKey, boost } = categorize(text)
+    // Groq AI categorisation (falls back to keywords if key missing or request fails)
+    const { stat_key: statKey, boost } = await categorize(text)
 
     // Add entry to DB
     await addEntry(text, statKey, boost)

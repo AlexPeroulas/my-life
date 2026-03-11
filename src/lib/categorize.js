@@ -1,9 +1,7 @@
 /**
- * Client-side entry categorisation — no API key, no network call, works offline.
- * Scores each stat against the entry text using weighted keywords, returns the winner.
- *
- * To swap to Groq AI instead: set VITE_GROQ_API_KEY in your .env and
- * uncomment the groqCategorize() block at the bottom of this file.
+ * Entry categorisation using Groq AI (llama-3.1-8b-instant).
+ * Falls back to keyword matching if the key is missing or the request fails.
+ * Requires VITE_GROQ_API_KEY in .env
  */
 
 const KEYWORD_MAP = {
@@ -82,21 +80,17 @@ const KEYWORD_MAP = {
   },
 }
 
-/**
- * Score a text string against all stat keyword lists.
- * Returns { stat_key, boost, confidence }
- */
-export function categorize(text) {
+const VALID_KEYS = ['mind', 'fitness', 'nature', 'hygiene', 'nutrition', 'social', 'sleep']
+
+/** Keyword fallback — instant, works offline */
+function keywordCategorize(text) {
   const lower = text.toLowerCase()
   const scores = {}
 
   for (const [stat, { terms }] of Object.entries(KEYWORD_MAP)) {
     let score = 0
     for (const term of terms) {
-      if (lower.includes(term)) {
-        // Longer matches worth more (multi-word phrases)
-        score += term.includes(' ') ? 3 : 1
-      }
+      if (lower.includes(term)) score += term.includes(' ') ? 3 : 1
     }
     scores[stat] = score
   }
@@ -104,33 +98,17 @@ export function categorize(text) {
   const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1])
   const [topStat, topScore] = sorted[0]
   const [, secondScore] = sorted[1] ?? ['', 0]
-
-  // Boost: more words logged = bigger boost (15–25 range)
   const wordCount = text.trim().split(/\s+/).length
   const boost = Math.min(25, Math.max(15, 13 + Math.floor(wordCount / 3)))
+  const confidence = topScore === 0 ? 'low' : topScore - secondScore >= 2 ? 'high' : 'medium'
 
-  // Confidence based on score margin
-  const confidence =
-    topScore === 0      ? 'low'    :
-    topScore - secondScore >= 2 ? 'high' : 'medium'
-
-  // If nothing matched, make a best guess from word count position
-  const stat_key = topScore > 0 ? topStat : 'mind'
-
-  return { stat_key, boost, confidence }
+  return { stat_key: topScore > 0 ? topStat : 'mind', boost, confidence }
 }
 
-/* ─────────────────────────────────────────────────────────────
-   OPTIONAL: Groq AI (free tier — ~14,400 calls/day)
-
-   1. Sign up free at console.groq.com
-   2. Create an API key
-   3. Add VITE_GROQ_API_KEY=gsk_... to your .env
-   4. Change the export at the bottom of this file
-
+/** Groq AI categorisation with keyword fallback */
 export async function categorize(text) {
   const key = import.meta.env.VITE_GROQ_API_KEY
-  if (!key) return keywordCategorize(text) // fallback
+  if (!key) return keywordCategorize(text)
 
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -142,27 +120,41 @@ export async function categorize(text) {
       body: JSON.stringify({
         model: 'llama-3.1-8b-instant',
         max_tokens: 60,
+        temperature: 0,
         messages: [{
           role: 'user',
           content: `Categorize this life log entry into exactly ONE of: mind, fitness, nature, hygiene, nutrition, social, sleep.
-Entry: "${text}"
-Reply ONLY with JSON: {"stat_key":"<key>","boost":<12-25>,"confidence":"high|medium|low"}`,
+
+mind = reading, learning, meditation, journaling, creativity, studying
+fitness = exercise, gym, sport, running, walking, physical activity
+nature = outdoors, parks, gardening, sunlight, fresh air, hiking
+hygiene = shower, grooming, cleaning, skincare, tidying, self-care
+nutrition = food, eating, drinking water, cooking, diet, supplements
+social = friends, family, conversation, calls, meetings, relationships
+sleep = rest, nap, recovery, bedtime, relaxation, wind-down
+
+Entry: "${text.slice(0, 300)}"
+
+Reply ONLY with this exact JSON format, nothing else:
+{"stat_key":"<key>","boost":<number 12-25>,"confidence":"high|medium|low"}`,
         }],
       }),
     })
+
+    if (!res.ok) throw new Error(`Groq ${res.status}`)
+
     const json = await res.json()
-    const raw = json.choices?.[0]?.message?.content ?? ''
+    const raw = json.choices?.[0]?.message?.content?.trim() ?? ''
     const match = raw.match(/\{[^}]+\}/)
-    if (!match) throw new Error('no json')
+    if (!match) throw new Error('no json in response')
+
     const parsed = JSON.parse(match[0])
-    const valid = ['mind','fitness','nature','hygiene','nutrition','social','sleep']
-    if (!valid.includes(parsed.stat_key)) throw new Error('invalid key')
+    if (!VALID_KEYS.includes(parsed.stat_key)) throw new Error('invalid stat_key')
     parsed.boost = Math.min(25, Math.max(12, parseInt(parsed.boost) || 18))
+
     return parsed
-  } catch {
+  } catch (err) {
+    console.warn('Groq categorise failed, using keyword fallback:', err.message)
     return keywordCategorize(text)
   }
 }
-
-// rename the main function above to keywordCategorize() if using this
-─────────────────────────────────────────────────────────────── */
