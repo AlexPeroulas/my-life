@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Generate My Life Icons</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 40px; max-width: 520px; background: #f5f5f5; }
+    h2   { color: #0066FF; margin-bottom: 8px; }
+    p    { color: #555; font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+    code { background: #e8e8e8; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+    .btns { display: flex; gap: 12px; margin-bottom: 24px; }
+    button {
+      padding: 12px 20px; border: none; border-radius: 8px;
+      background: #0066FF; color: white; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: background 0.15s;
+    }
+    button:hover { background: #0052CC; }
+    canvas { border: 1px solid #ddd; border-radius: 8px; background: white; }
+    .note { margin-top: 20px; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <h2>My Life — Icon Generator</h2>
+  <p>
+    Click each button to download the icon file, then move both files into
+    <code>public/icons/</code> inside your project.
+  </p>
+  <div class="btns">
+    <button onclick="generateAndDownload(192)">⬇ Download icon-192.png</button>
+    <button onclick="generateAndDownload(512)">⬇ Download icon-512.png</button>
+  </div>
+  <canvas id="preview" width="192" height="192"></canvas>
+  <div class="note">Preview above shows the 192×192 icon.</div>
+
+  <script>
+    function drawIcon(ctx, size) {
+      const r = size * 0.18
+
+      // Blue gradient background
+      const grad = ctx.createLinearGradient(0, 0, size, size)
+      grad.addColorStop(0, '#1a75ff')
+      grad.addColorStop(1, '#0044cc')
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.moveTo(r, 0)
+      ctx.lineTo(size - r, 0)
+      ctx.quadraticCurveTo(size, 0, size, r)
+      ctx.lineTo(size, size - r)
+      ctx.quadraticCurveTo(size, size, size - r, size)
+      ctx.lineTo(r, size)
+      ctx.quadraticCurveTo(0, size, 0, size - r)
+      ctx.lineTo(0, r)
+      ctx.quadraticCurveTo(0, 0, r, 0)
+      ctx.closePath()
+      ctx.fill()
+
+      // Subtle white circle glow
+      const glow = ctx.createRadialGradient(size * 0.4, size * 0.35, 0, size * 0.5, size * 0.5, size * 0.6)
+      glow.addColorStop(0, 'rgba(255,255,255,0.18)')
+      glow.addColorStop(1, 'rgba(255,255,255,0)')
+      ctx.fillStyle = glow
+      ctx.fillRect(0, 0, size, size)
+
+      // "M" letter
+      ctx.fillStyle = '#ffffff'
+      ctx.font = `900 ${Math.round(size * 0.56)}px Arial, sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.shadowColor = 'rgba(0,0,0,0.2)'
+      ctx.shadowBlur = size * 0.04
+      ctx.fillText('M', size / 2, size / 2 + size * 0.02)
+      ctx.shadowBlur = 0
+
+      // Small green dot accent (bottom-right)
+      const dotR = size * 0.075
+      const dotX = size * 0.76
+      const dotY = size * 0.76
+      ctx.fillStyle = '#00E676'
+      ctx.beginPath()
+      ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    function generateAndDownload(size) {
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      drawIcon(ctx, size)
+
+      const a = document.createElement('a')
+      a.download = `icon-${size}.png`
+      a.href = canvas.toDataURL('image/png')
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    }
+
+    // Render preview on load
+    window.addEventListener('load', () => {
+      const canvas = document.getElementById('preview')
+      const ctx = canvas.getContext('2d')
+      drawIcon(ctx, 192)
+    })
+  </script>
+</body>
+</html>
