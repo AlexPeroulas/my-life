@@ -22,6 +22,7 @@
 
 html, body, #root {
   height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -37,14 +38,13 @@ body {
   height: 100%;
   display: flex;
   justify-content: center;
-  overflow-y: auto;
   background: #F0F2F5;
 }
 
 .phone-frame {
   max-width: 430px;
   width: 100%;
-  min-height: 100vh;
+  height: 100%;
   background: #ffffff;
   display: flex;
   flex-direction: column;
@@ -53,14 +53,28 @@ body {
 }
 
 @media (min-width: 500px) {
+  html, body, #root {
+    overflow: auto;
+  }
+  .app-shell {
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto;
+    padding: 32px 16px 48px;
+    align-items: flex-start;
+  }
   .phone-frame {
+    height: auto;
+    min-height: 600px;
     border-radius: 44px;
     box-shadow:
       0 0 0 1px rgba(0,0,0,0.08),
       0 20px 60px rgba(0,0,0,0.22),
       0 4px 16px rgba(0,0,0,0.14);
-    min-height: unset;
-    margin: 24px 0;
+    margin: 0;
+  }
+  .scroll-body {
+    max-height: 75vh;
   }
 }
 
@@ -300,10 +314,13 @@ body {
    ============================================================ */
 .scroll-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-bottom: calc(var(--safe-bottom) + 80px);
   scrollbar-width: none;
   -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .scroll-body::-webkit-scrollbar {
