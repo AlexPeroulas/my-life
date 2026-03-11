@@ -125,13 +125,15 @@ export async function categorize(text) {
           role: 'user',
           content: `Categorize this life log entry into exactly ONE of: mind, fitness, nature, hygiene, nutrition, social, sleep.
 
-mind = reading, learning, meditation, journaling, creativity, studying
-fitness = exercise, gym, sport, running, walking, physical activity
-nature = outdoors, parks, gardening, sunlight, fresh air, hiking
-hygiene = shower, grooming, cleaning, skincare, tidying, self-care
-nutrition = food, eating, drinking water, cooking, diet, supplements
-social = friends, family, conversation, calls, meetings, relationships
-sleep = rest, nap, recovery, bedtime, relaxation, wind-down
+mind = reading, studying, learning, coding, programming, building apps, writing, journaling, meditation, creativity, puzzles, courses, thinking, problem solving, any mental or intellectual activity
+fitness = gym, exercise, running, walking, sport, weights, yoga, physical training, any bodily movement workout
+nature = outdoors, parks, garden, sunlight, fresh air, hiking, beach, forest
+hygiene = shower, grooming, cleaning, skincare, tidying, organising, self-care
+nutrition = food, eating, drinking water, cooking, diet, supplements, meal prep
+social = friends, family, conversation, calls, meetings, relationships, socialising
+sleep = rest, nap, recovery, bedtime, relaxation, wind-down, sleep routine
+
+Important: coding, programming, building software, developing apps = mind (NOT fitness)
 
 Entry: "${text.slice(0, 300)}"
 
