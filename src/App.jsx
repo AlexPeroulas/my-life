@@ -6,6 +6,7 @@ import {
   getHealthState,
   todayISO,
 } from './lib/constants.js'
+import { categorize } from './lib/categorize.js'
 import { useStats } from './hooks/useStats.js'
 import { useEntries } from './hooks/useEntries.js'
 
@@ -135,23 +136,8 @@ export default function App() {
   const handleLogEntry = useCallback(async (text) => {
     if (!userId) return null
 
-    let statKey = 'nutrition'
-    let boost = 18
-
-    try {
-      const resp = await fetch('/.netlify/functions/categorize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
-      if (resp.ok) {
-        const json = await resp.json()
-        if (json.stat_key) statKey = json.stat_key
-        if (json.boost)    boost   = json.boost
-      }
-    } catch (err) {
-      console.warn('Categorize function unavailable, using defaults:', err.message)
-    }
+    // Client-side keyword categorisation — instant, free, works offline
+    const { stat_key: statKey, boost } = categorize(text)
 
     // Add entry to DB
     await addEntry(text, statKey, boost)
