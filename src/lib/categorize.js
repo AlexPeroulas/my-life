@@ -1,8 +1,9 @@
 /**
- * Entry categorisation using Groq AI (llama-3.1-8b-instant).
- * Falls back to keyword matching if the key is missing or the request fails.
- * Requires VITE_GROQ_API_KEY in .env
+ * Entry categorisation via the /categorize Netlify function (Groq key stays server-side).
+ * Falls back to keyword matching if the request fails.
  */
+
+import { supabase } from './supabase.js'
 
 const KEYWORD_MAP = {
   mind: {
@@ -80,8 +81,6 @@ const KEYWORD_MAP = {
   },
 }
 
-const VALID_KEYS = ['mind', 'fitness', 'nature', 'hygiene', 'nutrition', 'social', 'sleep']
-
 /** Keyword fallback — instant, works offline */
 function keywordCategorize(text) {
   const lower = text.toLowerCase()
@@ -96,67 +95,42 @@ function keywordCategorize(text) {
   }
 
   const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1])
-  const [topStat, topScore] = sorted[0]
+  const [, topScore] = sorted[0]
   const [, secondScore] = sorted[1] ?? ['', 0]
   const wordCount = text.trim().split(/\s+/).length
   const boost = Math.min(25, Math.max(15, 13 + Math.floor(wordCount / 3)))
   const confidence = topScore === 0 ? 'low' : topScore - secondScore >= 2 ? 'high' : 'medium'
 
-  return { stat_key: topScore > 0 ? topStat : 'mind', boost, confidence }
+  if (topScore === 0) return { stats: [{ stat_key: 'mind', boost }], confidence }
+
+  // Secondary stats: at least half the top score, max 3 total
+  const stats = sorted
+    .filter(([, score], i) => i === 0 || score >= Math.max(2, topScore / 2))
+    .slice(0, 3)
+    .map(([stat_key], i) => ({ stat_key, boost: i === 0 ? boost : Math.round(boost * 0.6) }))
+
+  return { stats, confidence }
 }
 
-/** Groq AI categorisation with keyword fallback */
+/** Server-side AI categorisation with keyword fallback */
 export async function categorize(text) {
-  const key = import.meta.env.VITE_GROQ_API_KEY
-  if (!key) return keywordCategorize(text)
-
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/.netlify/functions/categorize', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`,
+        Authorization: `Bearer ${session?.access_token ?? ''}`,
       },
-      body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        max_tokens: 60,
-        temperature: 0,
-        messages: [{
-          role: 'user',
-          content: `Categorize this life log entry into exactly ONE of: mind, fitness, nature, hygiene, nutrition, social, sleep.
-
-mind = reading, studying, learning, coding, programming, building apps, writing, journaling, meditation, creativity, puzzles, courses, thinking, problem solving, any mental or intellectual activity
-fitness = gym, exercise, running, walking, sport, weights, yoga, physical training, any bodily movement workout
-nature = outdoors, parks, garden, sunlight, fresh air, hiking, beach, forest
-hygiene = shower, grooming, cleaning, skincare, tidying, organising, self-care
-nutrition = food, eating, drinking water, cooking, diet, supplements, meal prep
-social = friends, family, conversation, calls, meetings, relationships, socialising
-sleep = rest, nap, recovery, bedtime, relaxation, wind-down, sleep routine
-
-Important: coding, programming, building software, developing apps = mind (NOT fitness)
-
-Entry: "${text.slice(0, 300)}"
-
-Reply ONLY with this exact JSON format, nothing else:
-{"stat_key":"<key>","boost":<number 12-25>,"confidence":"high|medium|low"}`,
-        }],
-      }),
+      body: JSON.stringify({ text: text.slice(0, 300) }),
     })
+    if (!res.ok) throw new Error(`categorize ${res.status}`)
 
-    if (!res.ok) throw new Error(`Groq ${res.status}`)
-
-    const json = await res.json()
-    const raw = json.choices?.[0]?.message?.content?.trim() ?? ''
-    const match = raw.match(/\{[^}]+\}/)
-    if (!match) throw new Error('no json in response')
-
-    const parsed = JSON.parse(match[0])
-    if (!VALID_KEYS.includes(parsed.stat_key)) throw new Error('invalid stat_key')
-    parsed.boost = Math.min(25, Math.max(12, parseInt(parsed.boost) || 18))
-
-    return parsed
+    const data = await res.json()
+    if (!data.stats?.length) throw new Error('no stats in response')
+    return data
   } catch (err) {
-    console.warn('Groq categorise failed, using keyword fallback:', err.message)
+    console.warn('AI categorise failed, using keyword fallback:', err.message)
     return keywordCategorize(text)
   }
 }

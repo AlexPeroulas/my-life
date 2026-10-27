@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { STATS_CONFIG, todayISO, formatDate } from '../lib/constants.js'
+import { STATS_CONFIG, entryStats, todayISO, formatDate } from '../lib/constants.js'
 
 const DAY_NAMES = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 
@@ -183,7 +183,9 @@ export default function Calendar({ userId, onSelectDate, selectedDate }) {
             </div>
           ) : (
             dayEntries.map(entry => {
-              const cfg = STATS_CONFIG.find(s => s.key === entry.stat_key)
+              const stats = entryStats(entry)
+              const cfg = STATS_CONFIG.find(s => s.key === stats[0].stat_key)
+              const totalBoost = stats.reduce((sum, s) => sum + (s.boost || 0), 0)
               return (
                 <div
                   key={entry.id}
@@ -191,10 +193,14 @@ export default function Calendar({ userId, onSelectDate, selectedDate }) {
                   style={{ borderLeftColor: cfg?.color || '#0066FF' }}
                 >
                   <div className="entry-item-header">
-                    <span>{cfg?.emoji || '📝'}</span>
-                    <span>{cfg?.label || entry.stat_key || 'General'}</span>
-                    {entry.boost && (
-                      <span style={{ color: '#00994d', marginLeft: 'auto' }}>+{entry.boost} XP</span>
+                    {stats.map(s => {
+                      const sCfg = STATS_CONFIG.find(c => c.key === s.stat_key)
+                      return (
+                        <span key={s.stat_key}>{sCfg?.emoji || '📝'} {sCfg?.label || s.stat_key || 'General'}</span>
+                      )
+                    })}
+                    {totalBoost > 0 && (
+                      <span style={{ color: '#00994d', marginLeft: 'auto' }}>+{totalBoost} XP</span>
                     )}
                   </div>
                   <div className="entry-item-text">{entry.content}</div>

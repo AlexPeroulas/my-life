@@ -5,6 +5,8 @@ import {
   calcAvg,
   getHealthState,
   todayISO,
+  DEFAULT_DISPLAY_NAME,
+  DEFAULT_GENDER,
 } from './lib/constants.js'
 import { categorize } from './lib/categorize.js'
 import { useStats } from './hooks/useStats.js'
@@ -105,7 +107,7 @@ export default function App() {
         // No profile row — create one
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
-          .insert({ id: uid, display_name: 'Alex', gender: 'male' })
+          .insert({ id: uid, display_name: DEFAULT_DISPLAY_NAME, gender: DEFAULT_GENDER })
           .select()
           .single()
         if (!insertError) setProfile(newProfile)
@@ -136,20 +138,20 @@ export default function App() {
   const handleLogEntry = useCallback(async (text) => {
     if (!userId) return null
 
-    // Groq AI categorisation (falls back to keywords if key missing or request fails)
-    const { stat_key: statKey, boost } = await categorize(text)
+    // AI categorisation (falls back to keywords if the request fails)
+    const { stats } = await categorize(text)
 
     // Add entry to DB
-    await addEntry(text, statKey, boost)
+    await addEntry(text, stats)
 
-    // Boost the stat
-    await boostStat(statKey, boost)
+    // Boost each stat + floating XP animation
+    for (const [i, { stat_key: statKey, boost }] of stats.entries()) {
+      await boostStat(statKey, boost)
+      const cfg = STATS_CONFIG.find(s => s.key === statKey)
+      showXpFloat(cfg?.color || '#00E676', window.innerWidth / 2 + (i - (stats.length - 1) / 2) * 60, window.innerHeight * 0.4)
+    }
 
-    // Floating XP animation
-    const cfg = STATS_CONFIG.find(s => s.key === statKey)
-    showXpFloat(cfg?.color || '#00E676', window.innerWidth / 2, window.innerHeight * 0.4)
-
-    return { statKey, boost }
+    return { stats }
   }, [userId, addEntry, boostStat])
 
   // ── Settings save ──────────────────────────────────────────
@@ -172,9 +174,9 @@ export default function App() {
   // ── Derived avatar state ───────────────────────────────────
   const avg = calcAvg(statValues)
   const healthState = getHealthState(avg)
-  const gender = profile?.gender || 'male'
-  const avatarEmoji = healthState.emoji[gender] || healthState.emoji.male
-  const displayName = profile?.display_name || 'Alex'
+  const gender = profile?.gender || DEFAULT_GENDER
+  const avatarEmoji = healthState.emoji[gender] || healthState.emoji[DEFAULT_GENDER]
+  const displayName = profile?.display_name || DEFAULT_DISPLAY_NAME
 
   // ── Render ─────────────────────────────────────────────────
   if (loading || statsLoading) return <LoadingScreen />
@@ -303,6 +305,7 @@ export default function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         profile={profile}
+        userId={userId}
         onSave={handleSettingsSave}
         onSignOut={handleSignOut}
       />

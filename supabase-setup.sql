@@ -6,8 +6,8 @@
 -- ── 1. PROFILES TABLE ───────────────────────────────────────
 create table if not exists public.profiles (
   id            uuid primary key references auth.users(id) on delete cascade,
-  display_name  text not null default 'Alex',
-  gender        text not null default 'male' check (gender in ('male', 'female')),
+  display_name  text not null default 'Adventurer',
+  gender        text not null default 'neutral' check (gender in ('neutral', 'male', 'female')),
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
@@ -32,6 +32,7 @@ create table if not exists public.entries (
   content     text not null,
   stat_key    text not null check (stat_key in ('mind','fitness','nature','hygiene','nutrition','social','sleep')),
   boost       integer not null default 18,
+  stats       jsonb,  -- [{stat_key, boost}] for multi-stat entries; stat_key holds the primary
   created_at  timestamptz not null default now()
 );
 
@@ -103,5 +104,28 @@ create trigger profiles_updated_at
 create trigger stat_values_updated_at
   before update on public.stat_values
   for each row execute procedure public.handle_updated_at();
+
+-- ── 9. PUSH SUBSCRIPTIONS ───────────────────────────────────
+create table if not exists public.push_subscriptions (
+  endpoint      text primary key,
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  subscription  jsonb not null,
+  created_at    timestamptz not null default now()
+);
+
+alter table public.push_subscriptions enable row level security;
+
+create policy "Users manage own push subscriptions"
+  on public.push_subscriptions for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- ── MIGRATION (existing databases only) ─────────────────────
+-- alter table public.entries add column if not exists stats jsonb;
+-- alter table public.profiles drop constraint if exists profiles_gender_check;
+-- alter table public.profiles add constraint profiles_gender_check check (gender in ('neutral', 'male', 'female'));
+-- alter table public.profiles alter column gender set default 'neutral';
+-- alter table public.profiles alter column display_name set default 'Adventurer';
+-- (then run section 9 above)
 
 -- Done! Your database is ready.

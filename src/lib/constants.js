@@ -17,7 +17,7 @@ export const STAT_START      = 50
 export const HEALTH_STATES = [
   {
     min: 75,
-    emoji:  { male: '🧑', female: '👩' },
+    emoji:  { neutral: '🧑', male: '👨', female: '👩' },
     label:  'Thriving',
     border: 'rgba(0,230,118,0.95)',
     glow:   '0 0 0 8px rgba(0,230,118,0.22), 0 10px 36px rgba(0,0,0,0.4)',
@@ -29,7 +29,7 @@ export const HEALTH_STATES = [
   },
   {
     min: 50,
-    emoji:  { male: '🧑', female: '👩' },
+    emoji:  { neutral: '🧑', male: '👨', female: '👩' },
     label:  'Doing Well',
     border: 'rgba(255,255,255,0.55)',
     glow:   '0 0 0 6px rgba(255,255,255,0.12), 0 8px 32px rgba(0,0,0,0.35)',
@@ -41,7 +41,7 @@ export const HEALTH_STATES = [
   },
   {
     min: 25,
-    emoji:  { male: '😓', female: '😓' },
+    emoji:  { neutral: '😓', male: '😓', female: '😓' },
     label:  'Struggling',
     border: 'rgba(255,165,0,0.9)',
     glow:   '0 0 0 8px rgba(255,165,0,0.2), 0 10px 36px rgba(0,0,0,0.4)',
@@ -53,7 +53,7 @@ export const HEALTH_STATES = [
   },
   {
     min: 0,
-    emoji:  { male: '😰', female: '😰' },
+    emoji:  { neutral: '😰', male: '😰', female: '😰' },
     label:  'Critical',
     border: 'rgba(255,50,50,0.9)',
     glow:   '0 0 0 8px rgba(255,0,0,0.22), 0 10px 36px rgba(0,0,0,0.45)',
@@ -98,16 +98,35 @@ export function calcAvg(statValues) {
   return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
 }
 
+/** Whole local calendar days between two YYYY-MM-DD dates */
+export function daysBetween(fromISO, toISO) {
+  return Math.round((new Date(toISO + 'T12:00:00') - new Date(fromISO + 'T12:00:00')) / 86400000)
+}
+
+/**
+ * Display-time decay. `value` is the stored value as of `lastDate`;
+ * the decayed result is never written back, so reloads don't stack decay.
+ */
 export function applyDecay(value, lastDate) {
   if (!lastDate) return value
-  const days = Math.floor((Date.now() - new Date(lastDate).getTime()) / 86400000)
+  const days = daysBetween(lastDate, todayISO())
   if (days <= 0) return value
   return Math.max(STAT_MIN, value - days * DECAY_PER_DAY)
 }
 
+/** Today's date in the user's local timezone (YYYY-MM-DD) */
 export function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+/** Stats an entry boosted; older single-stat rows have no `stats` column value */
+export function entryStats(entry) {
+  return entry.stats?.length ? entry.stats : [{ stat_key: entry.stat_key, boost: entry.boost }]
+}
+
+export const DEFAULT_DISPLAY_NAME = 'Adventurer'
+export const DEFAULT_GENDER       = 'neutral'
 
 export function formatDate(iso) {
   const d = new Date(iso + 'T12:00:00')

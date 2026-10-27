@@ -28,7 +28,7 @@ export function useEntries(userId) {
     }
   }, [userId])
 
-  const addEntry = useCallback(async (content, statKey, boost) => {
+  const addEntry = useCallback(async (content, stats) => {
     if (!userId) return null
     const today = todayISO()
     try {
@@ -38,8 +38,9 @@ export function useEntries(userId) {
           user_id: userId,
           date: today,
           content,
-          stat_key: statKey,
-          boost,
+          stat_key: stats[0].stat_key,
+          boost: stats.reduce((sum, s) => sum + s.boost, 0),
+          stats,
           created_at: new Date().toISOString(),
         })
         .select()

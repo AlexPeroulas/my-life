@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
 import {
   STATS_CONFIG,
   STAT_START,
   STAT_MAX,
   applyDecay,
+  daysBetween,
   todayISO,
 } from '../lib/constants.js'
 
@@ -22,7 +23,8 @@ function buildDefaults() {
 
 export function useStats(userId) {
   const defaults = buildDefaults()
-  const [statValues, setStatValues] = useState(defaults.values)
+  // Raw values as of each stat's last_logged; decay is applied at read time
+  const [storedValues, setStoredValues] = useState(defaults.values)
   const [lastLogged, setLastLogged] = useState(defaults.lastLogged)
   const [streaks, setStreaks] = useState(defaults.streaks)
   const [loading, setLoading] = useState(true)
@@ -48,25 +50,16 @@ export function useStats(userId) {
       const newValues = { ...defaults.values }
       const newLastLogged = { ...defaults.lastLogged }
       const newStreaks = { ...defaults.streaks }
-      const upserts = []
+      const missing = []
 
       STATS_CONFIG.forEach(s => {
         const row = data?.find(r => r.stat_key === s.key)
         if (row) {
-          const decayed = applyDecay(row.value, row.last_logged)
-          newValues[s.key] = decayed
+          newValues[s.key] = row.value
           newLastLogged[s.key] = row.last_logged
           newStreaks[s.key] = row.streak || 0
-          upserts.push({
-            user_id: uid,
-            stat_key: s.key,
-            value: decayed,
-            last_logged: row.last_logged,
-            streak: row.streak || 0,
-            updated_at: new Date().toISOString(),
-          })
         } else {
-          upserts.push({
+          missing.push({
             user_id: uid,
             stat_key: s.key,
             value: STAT_START,
@@ -77,14 +70,16 @@ export function useStats(userId) {
         }
       })
 
-      setStatValues(newValues)
+      setStoredValues(newValues)
       setLastLogged(newLastLogged)
       setStreaks(newStreaks)
 
-      // Save decayed values back to DB
-      await supabase
-        .from('stat_values')
-        .upsert(upserts, { onConflict: 'user_id,stat_key' })
+      // Create rows for stats the user doesn't have yet (never overwrite existing ones)
+      if (missing.length) {
+        await supabase
+          .from('stat_values')
+          .upsert(missing, { onConflict: 'user_id,stat_key', ignoreDuplicates: true })
+      }
     } catch (err) {
       console.error('useStats loadStats error:', err)
     } finally {
@@ -96,16 +91,14 @@ export function useStats(userId) {
     if (!userId) return
 
     const today = todayISO()
-    const current = statValues[statKey] ?? STAT_START
+    const current = applyDecay(storedValues[statKey] ?? STAT_START, lastLogged[statKey])
     const newValue = Math.min(STAT_MAX, current + amount)
 
     // Calculate streak: if last logged was yesterday or today, increment; else reset to 1
     const last = lastLogged[statKey]
     let newStreak = streaks[statKey] || 0
     if (last) {
-      const lastDate = new Date(last + 'T12:00:00')
-      const todayDate = new Date(today + 'T12:00:00')
-      const diffDays = Math.round((todayDate - lastDate) / 86400000)
+      const diffDays = daysBetween(last, today)
       if (diffDays === 0) {
         // same day — keep streak
       } else if (diffDays === 1) {
@@ -118,7 +111,10 @@ export function useStats(userId) {
     }
 
     // Optimistic update
-    setStatValues(prev => ({ ...prev, [statKey]: newValue }))
+    const prevStored = storedValues[statKey]
+    const prevLast = lastLogged[statKey]
+    const prevStreak = streaks[statKey]
+    setStoredValues(prev => ({ ...prev, [statKey]: newValue }))
     setLastLogged(prev => ({ ...prev, [statKey]: today }))
     setStreaks(prev => ({ ...prev, [statKey]: newStreak }))
 
@@ -140,9 +136,19 @@ export function useStats(userId) {
     } catch (err) {
       console.error('boostStat error:', err)
       // Revert on error
-      setStatValues(prev => ({ ...prev, [statKey]: current }))
+      setStoredValues(prev => ({ ...prev, [statKey]: prevStored }))
+      setLastLogged(prev => ({ ...prev, [statKey]: prevLast }))
+      setStreaks(prev => ({ ...prev, [statKey]: prevStreak }))
     }
-  }, [userId, statValues, lastLogged, streaks])
+  }, [userId, storedValues, lastLogged, streaks])
+
+  const statValues = useMemo(() => {
+    const values = {}
+    STATS_CONFIG.forEach(s => {
+      values[s.key] = applyDecay(storedValues[s.key], lastLogged[s.key])
+    })
+    return values
+  }, [storedValues, lastLogged])
 
   return { statValues, lastLogged, streaks, boostStat, loading }
 }

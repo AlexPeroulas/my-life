@@ -26,4 +26,12 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  {
+    files: ['netlify/**/*.js'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['public/push-sw.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
 ])

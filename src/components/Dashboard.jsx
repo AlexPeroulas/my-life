@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   STATS_CONFIG,
+  entryStats,
   getDailyQuote,
   calcAvg,
   getHealthState,
@@ -52,8 +53,9 @@ export default function Dashboard({ stats, statStreaks, onLogEntry, profile, ent
     try {
       const result = await onLogEntry(text)
       if (result) {
-        const cfg = STATS_CONFIG.find(s => s.key === result.statKey)
-        setSuccessMsg(`+${result.boost} XP to ${cfg ? cfg.label : result.statKey}!`)
+        const total = result.stats.reduce((sum, s) => sum + s.boost, 0)
+        const labels = result.stats.map(s => STATS_CONFIG.find(c => c.key === s.stat_key)?.label || s.stat_key)
+        setSuccessMsg(`+${total} XP to ${labels.join(' & ')}!`)
         setLogText('')
       }
     } catch (err) {
@@ -181,7 +183,9 @@ export default function Dashboard({ stats, statStreaks, onLogEntry, profile, ent
               </div>
             </div>
             {entries.map(entry => {
-              const cfg = STATS_CONFIG.find(s => s.key === entry.stat_key)
+              const stats = entryStats(entry)
+              const cfg = STATS_CONFIG.find(s => s.key === stats[0].stat_key)
+              const totalBoost = stats.reduce((sum, s) => sum + (s.boost || 0), 0)
               return (
                 <div
                   key={entry.id}
@@ -189,10 +193,14 @@ export default function Dashboard({ stats, statStreaks, onLogEntry, profile, ent
                   style={{ borderLeftColor: cfg?.color || '#0066FF' }}
                 >
                   <div className="entry-item-header">
-                    <span>{cfg?.emoji || '📝'}</span>
-                    <span>{cfg?.label || entry.stat_key || 'General'}</span>
-                    {entry.boost && (
-                      <span style={{ color: '#00994d', marginLeft: 'auto' }}>+{entry.boost} XP</span>
+                    {stats.map(s => {
+                      const sCfg = STATS_CONFIG.find(c => c.key === s.stat_key)
+                      return (
+                        <span key={s.stat_key}>{sCfg?.emoji || '📝'} {sCfg?.label || s.stat_key || 'General'}</span>
+                      )
+                    })}
+                    {totalBoost > 0 && (
+                      <span style={{ color: '#00994d', marginLeft: 'auto' }}>+{totalBoost} XP</span>
                     )}
                   </div>
                   <div className="entry-item-text">{entry.content}</div>
