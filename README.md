@@ -1,16 +1,24 @@
-# React + Vite
+# My Life RPG
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A life stat tracker that turns everyday activities into RPG-style stats. Log what you did, and an LLM decides which areas of your life it improves: Fitness, Mind, Nutrition, Nature, and more. Stats slowly decay over time, so staying balanced takes consistency.
 
-Currently, two official plugins are available:
+**Live:** https://euphonious-pothos-4ef000.netlify.app
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+![Screenshot](screenshot.png)
 
-## React Compiler
+## How it works
+- Log an activity in plain English, like "went on a 10 mile hike"
+- A Netlify serverless function sends it to an LLM (Groq), which maps it to the stats it affects (a hike restores Fitness and Nature)
+- Stats are stored per user in Supabase and decay over time if you stop working on them
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Built with
+- JavaScript, Vite
+- Supabase (auth + Postgres)
+- Netlify (hosting + serverless functions)
+- Groq API (LLM activity classification)
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Running locally
+1. `npm install`
+2. Copy `.env.example` to `.env` and add your Supabase and Groq keys
+3. Run `supabase-setup.sql` in your Supabase project
+4. `npm run dev`
